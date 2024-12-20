@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="c.cpp" />
     <ClCompile Include="rk2informatics.cpp" />
   </ItemGroup>
   <ItemGroup>
