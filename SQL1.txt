@@ -1,0 +1,56 @@
+CREATE TABLE products (
+    id serial PRIMARY KEY,
+    name varchar(50),
+    quantity int
+);
+
+CREATE TABLE operations_log (
+    id serial PRIMARY KEY,
+    product_id int,
+    operation varchar(50) CHECK(operation IN ('ADD', 'REMOVE')),
+    quantity int,
+    FOREIGN KEY(product_id) REFERENCES products(id)
+);
+CREATE OR REPLACE PROCEDURE update_stock(product_id INT, operation VARCHAR, quantity INT)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF operation = 'ADD' THEN
+        UPDATE products
+        SET quantity = quantity + quantity
+        WHERE id = product_id;
+        
+        INSERT INTO operations_log (product_id, operation, quantity)
+        VALUES (product_id, operation, quantity);
+        
+    ELSIF operation = 'REMOVE' THEN
+        IF (SELECT quantity FROM products WHERE id = product_id) < quantity THEN
+            RAISE EXCEPTION 'Недостаточно товара на складе для выполнения операции.';
+        END IF;
+
+        UPDATE products
+        SET quantity = quantity - quantity
+        WHERE id = product_id;
+        
+        INSERT INTO operations_log (product_id, operation, quantity)
+        VALUES (product_id, operation, quantity);
+        
+    ELSE
+        RAISE EXCEPTION 'Неверный тип операции. Допустимые значения: ADD или REMOVE.';
+    END IF;
+END;
+$$;
+CREATE OR REPLACE FUNCTION log_operations()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        INSERT INTO operations_log (product_id, operation, quantity)
+        VALUES (NEW.id, CASE WHEN NEW.quantity > OLD.quantity THEN 'ADD' ELSE 'REMOVE' END, ABS(NEW.quantity - OLD.quantity));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER after_product_update
+AFTER UPDATE ON products
+FOR EACH ROW
+EXECUTE FUNCTION log_operations();
